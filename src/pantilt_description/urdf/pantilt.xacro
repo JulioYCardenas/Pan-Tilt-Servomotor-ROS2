@@ -1,0 +1,176 @@
+<?xml version="1.0"?>
+<robot name="pantilt" xmlns:xacro="http://www.ros.org/wiki/xacro">
+  <!-- CAMBIO 1: ruta al yaml de controladores. Vacío = no se carga el plugin (RViz/display) -->
+  <xacro:arg name="controllers_yaml" default=""/>
+
+  <!-- ===================== BASE ===================== -->
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://pantilt_description/meshes/base.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="gris">
+        <color rgba="0.6 0.6 0.6 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://pantilt_description/meshes/base.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.016"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="8.20e-6" ixy="0.0" ixz="0.0" iyy="8.20e-6" iyz="0.0" izz="1.62e-5"/>
+    </inertial>
+  </link>
+
+  <!-- ===================== PAN ===================== -->
+  <link name="pan_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://pantilt_description/meshes/pan.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="azul">
+        <color rgba="0.2 0.4 0.8 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://pantilt_description/meshes/pan.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.050"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="3.91e-5" ixy="0.0" ixz="0.0" iyy="3.91e-5" iyz="0.0" izz="2.08e-5"/>
+    </inertial>
+  </link>
+
+  <joint name="pan_joint" type="revolute">
+    <parent link="base_link"/>
+    <child link="pan_link"/>
+    <origin xyz="0 0 0.00435" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-1.5708" upper="1.5708" effort="0.216" velocity="13.09"/>
+  </joint>
+
+  <!-- ===================== TILT ===================== -->
+  <link name="tilt_link">
+    <visual>
+      <geometry>
+        <mesh filename="package://pantilt_description/meshes/tilt.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+      <material name="rojo">
+        <color rgba="0.8 0.2 0.2 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <mesh filename="package://pantilt_description/meshes/tilt.stl" scale="0.001 0.001 0.001"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.061"/>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <inertia ixx="9.15e-6" ixy="0.0" ixz="0.0" iyy="2.29e-5" iyz="0.0" izz="2.29e-5"/>
+    </inertial>
+  </link>
+
+  <joint name="tilt_joint" type="revolute">
+    <parent link="pan_link"/>
+    <child link="tilt_link"/>
+    <origin xyz="0 0.002 0.066" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.5708" upper="1.5708" effort="0.216" velocity="13.09"/>
+  </joint>
+
+  <!-- ===================== CÁMARA ===================== -->
+  <link name="camera_link">
+    <visual>
+      <geometry>
+        <box size="0.02 0.02 0.02"/>
+      </geometry>
+      <material name="negro">
+        <color rgba="0.1 0.1 0.1 1.0"/>
+      </material>
+    </visual>
+    <collision>
+      <geometry>
+        <box size="0.02 0.02 0.02"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <mass value="0.01"/>
+      <origin xyz="0 0 0"/>
+      <inertia ixx="1e-6" ixy="0.0" ixz="0.0" iyy="1e-6" iyz="0.0" izz="1e-6"/>
+    </inertial>
+  </link>
+
+  <!-- SIN CAMBIOS: posición de la cámara intacta -->
+  <joint name="camera_joint" type="fixed">
+    <parent link="tilt_link"/>
+    <child link="camera_link"/>
+    <!-- PLACEHOLDER: ajustar posición real de montaje en el Tilt -->
+    <origin xyz="-0.045 0 0" rpy="0 0 -3.14159"/>
+  </joint>
+
+  <link name="camera_optical_link"/>
+
+  <joint name="camera_optical_joint" type="fixed">
+    <parent link="camera_link"/>
+    <child link="camera_optical_link"/>
+    <!-- CAMBIO 2: convención óptica ROS (Z adelante, X derecha, Y abajo) -->
+    <origin xyz="0 0 0" rpy="-1.5708 0 -1.5708"/>
+  </joint>
+
+  <gazebo reference="camera_link">
+    <sensor name="pantilt_camera" type="camera">
+      <!-- CAMBIO 3: frame con el que Gazebo etiqueta imagen y camera_info -->
+      <gz_frame_id>camera_optical_link</gz_frame_id>
+      <camera>
+        <horizontal_fov>1.047</horizontal_fov>
+        <image>
+          <width>640</width>
+          <height>480</height>
+          <format>R8G8B8</format>
+        </image>
+        <clip>
+          <near>0.05</near>
+          <far>10.0</far>
+        </clip>
+      </camera>
+      <always_on>true</always_on>
+      <update_rate>145</update_rate>
+      <visualize>true</visualize>
+      <topic>/pantilt/camera/image_raw</topic>
+    </sensor>
+  </gazebo>
+
+  <!-- ===================== ROS2 CONTROL ===================== -->
+  <ros2_control name="PanTiltSystem" type="system">
+    <hardware>
+      <plugin>gz_ros2_control/GazeboSimSystem</plugin>
+    </hardware>
+    <joint name="pan_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+    <joint name="tilt_joint">
+      <command_interface name="position"/>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </ros2_control>
+
+  <!-- CAMBIO 4: el plugin solo se agrega si se pasa controllers_yaml (desde gazebo.launch.py) -->
+  <xacro:if value="${'$(arg controllers_yaml)' != ''}">
+    <gazebo>
+      <plugin filename="gz_ros2_control-system" name="gz_ros2_control::GazeboSimROS2ControlPlugin">
+        <parameters>$(arg controllers_yaml)</parameters>
+      </plugin>
+    </gazebo>
+  </xacro:if>
+
+</robot>
